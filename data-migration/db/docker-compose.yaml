@@ -1,0 +1,49 @@
+services:
+    mariadb:
+        container_name: callcenter-db
+        ports:
+            - '3306:3306'
+        restart: always
+        volumes:
+            - ./mysqldata/conf.d:/etc/mysql/conf.d
+            - ./mysqldata/initdb.d:/docker-entrypoint-initdb.d
+            - mariadb_data:/var/lib/mysql
+        environment:
+            - MYSQL_ROOT_PASSWORD=root
+            - TZ=Asia/Seoul
+            - MYSQL_MAX_CONNECTIONS=1000
+            - MYSQL_CONNECT_TIMEOUT=60
+            - MYSQL_WAIT_TIMEOUT=28800
+            - MYSQL_INTERACTIVE_TIMEOUT=28800
+        command:
+            - --max_connections=1000
+            - --connect_timeout=60
+            - --wait_timeout=28800
+            - --interactive_timeout=28800
+            - --max_allowed_packet=128M
+            - --innodb_buffer_pool_size=1G
+            - --innodb_log_file_size=256M
+            - --innodb_flush_log_at_trx_commit=2
+            - --innodb_flush_method=O_DIRECT
+        image: mariadb
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    cpus: '1'
+                    memory: 2G
+                reservations:
+                    cpus: '0.5'
+                    memory: 1G
+        ulimits:
+            nofile:
+                soft: 65535
+                hard: 65535
+
+volumes:
+    mariadb_data:
