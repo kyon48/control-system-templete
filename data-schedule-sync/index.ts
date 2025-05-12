@@ -7,6 +7,7 @@ import cron from 'node-cron';
 // .env 파일 로드
 dotenv.config();
 
+
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 // MySQL 연결 설정

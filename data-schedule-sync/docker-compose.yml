@@ -5,14 +5,16 @@ services:
     build: .
     environment:
       - NODE_ENV=production
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app-network
 
