@@ -204,6 +204,7 @@ async function syncLatestData(conn: mariadb.PoolConnection) {
                         return null;
                 }
             };
+            const complaintId = `CALL-${getPropertyValue('ID-2', 'unique_id')}`;
 
             const createdTime = new Date(new Date((page as PageObjectResponse).created_time).getTime());
             const editedTime = new Date(new Date((page as PageObjectResponse).last_edited_time).getTime());
@@ -212,7 +213,7 @@ async function syncLatestData(conn: mariadb.PoolConnection) {
             const formattedEditedTime = `${editedTime.getFullYear()}.${String(editedTime.getMonth() + 1).padStart(2, '0')}.${String(editedTime.getDate()).padStart(2, '0')} ${String(editedTime.getHours()).padStart(2, '0')}:${String(editedTime.getMinutes()).padStart(2, '0')}:${String(editedTime.getSeconds()).padStart(2, '0')}`;
 
             const complaintData: ComplaintData = {
-                complaint_id: `CALL-${getPropertyValue('ID-2', 'unique_id')}`,
+                complaint_id: complaintId,
                 complaint_date: parseDate(formattedcreatedTime),
                 last_edit_date: parseDate(formattedEditedTime),
                 complainant_tel_no: (getPropertyValue('신고자연락처', 'rich_text') || '').substring(0, 20),
@@ -239,70 +240,55 @@ async function syncLatestData(conn: mariadb.PoolConnection) {
 
             try {
                 // 기존 데이터 확인
-                const [rows] = await conn.query(
+                const [existingRows] = await conn.execute(
                     'SELECT complaint_id FROM t_complaint WHERE complaint_id = ?',
-                    [complaintData.complaint_id]
+                    [complaintId]
                 );
-
-                if (Array.isArray(rows) && rows.length > 0) {
+                console.log(existingRows);
+                if (existingRows) {
                     // 업데이트
-                    await conn.query(
-                        `UPDATE t_complaint SET
-                            complaint_date = ?,
-                            last_edit_date = ?,
-                            complainant_tel_no = ?,
-                            complainant_truck_no = ?,
-                            complainant_con_no = ?,
-                            target_service = ?,
-                            target_terminal = ?,
-                            complaint_status = ?,
-                            complaint_receiver = ?,
-                            complaint_handler = ?,
-                            complaint_type = ?,
-                            complaint_detail_type = ?,
-                            complaint_title = ?,
-                            complaint_content = ?,
-                            complaint_processing = ?,
-                            complaint_handling = ?
-                        WHERE complaint_id = ?`,
-                        [
-                            complaintData.complaint_date,
-                            complaintData.last_edit_date,
-                            complaintData.complainant_tel_no,
-                            complaintData.complainant_truck_no,
-                            complaintData.complainant_con_no,
-                            complaintData.target_service,
-                            complaintData.target_terminal,
-                            complaintData.complaint_status,
-                            complaintData.complaint_receiver,
-                            complaintData.complaint_handler,
-                            complaintData.complaint_type,
-                            complaintData.complaint_detail_type,
-                            complaintData.complaint_title,
-                            complaintData.complaint_content,
-                            complaintData.complaint_processing,
-                            complaintData.complaint_handling,
-                            complaintData.complaint_id
-                        ]
-                    );
+                    const updateQuery = `
+                        UPDATE t_complaint SET
+                        complaint_date = ?,
+                        last_edit_date = ?,
+                        complainant_tel_no = ?,
+                        complainant_truck_no = ?,
+                        complainant_con_no = ?,
+                        target_service = ?,
+                        target_terminal = ?,
+                        complaint_status = ?,
+                        complaint_receiver = ?,
+                        complaint_handler = ?,
+                        complaint_type = ?,
+                        complaint_detail_type = ?,
+                        complaint_title = ?,
+                        complaint_content = ?,
+                        complaint_processing = ?,
+                        complaint_handling = ?
+                        WHERE complaint_id = ?
+                    `;
+
+                    await conn.execute(updateQuery, Object.values(complaintData));
                     console.log(`Updated record: ${complaintData.complaint_id}`);
                 } else {
                     // 삽입
-                    await conn.query(
-                        `INSERT INTO t_complaint (
+                    const insertQuery = `
+                        INSERT INTO t_complaint (
                             complaint_id, complaint_date, last_edit_date, complainant_tel_no,
                             complainant_truck_no, complainant_con_no, target_service,
                             target_terminal, complaint_status, complaint_receiver,
                             complaint_handler, complaint_type, complaint_detail_type,
                             complaint_title, complaint_content, complaint_processing,
                             complaint_handling
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        Object.values(complaintData)
-                    );
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `
+
+                    await conn.execute(insertQuery, Object.values(complaintData));                    
                     console.log(`Inserted record: ${complaintData.complaint_id}`);
                 }
             } catch (err) {
                 console.error(`Error processing record ${complaintData.complaint_id}:`, err);
+                throw err;
             }
         }
         console.log('Latest data sync completed successfully!');

@@ -48,7 +48,7 @@ services:
     networks:
       - app-network
 
-  data-sync:
+  data-schedule-sync:
     build: ./data-schedule-sync
     environment:
       - NODE_ENV=production

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  data-sync:
+  data-schedule-sync:
     build: .
     environment:
       - NODE_ENV=production
@@ -12,11 +12,15 @@ services:
       - DB_NAME=${DB_NAME}
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
-    restart: always
+    restart: "no"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
       - app-network
+    command: ["node", "dist/index.js"]
+    init: true
+    container_name: data-schedule-sync
+    rm: true
 
 networks:
   app-network:

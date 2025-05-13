@@ -56,6 +56,6 @@ docker ps | grep callcenter-db
 echo "2. 데이터 마이그레이션 상태:"
 docker ps | grep data-migration
 echo "3. 스케줄러 상태:"
-docker ps | grep data-sync
+docker ps | grep data-schedule-sync
 
 echo -e "\n${GREEN}🎉 시스템이 정상적으로 실행되었습니다.${NC}" 
