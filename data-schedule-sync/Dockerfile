@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -9,8 +9,5 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build TypeScript code
-RUN npm run build
-
 # Run the app
-CMD ["npm", "run", "prod"]
+CMD ["npm", "start"]
