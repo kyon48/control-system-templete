@@ -1,24 +1,21 @@
 version: '3.8'
 
 services:
-  db:
-    image: mariadb
-    container_name: callcenter-db
-    ports:
-      - '3306:3306'
-    restart: always
-    volumes:
-      - ./db/mysqldata/conf.d:/etc/mysql/conf.d
-      - ./db/mysqldata/initdb.d:/docker-entrypoint-initdb.d
-      - mariadb_data:/var/lib/mysql
+  callcenter-db:
+    image: mariadb:11.7.2
     environment:
-      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
       - TZ=Asia/Seoul
       - MYSQL_MAX_CONNECTIONS=1000
       - MYSQL_CONNECT_TIMEOUT=60
       - MYSQL_WAIT_TIMEOUT=28800
       - MYSQL_INTERACTIVE_TIMEOUT=28800
     command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
       - --max_connections=1000
       - --connect_timeout=60
       - --wait_timeout=28800
@@ -28,23 +25,29 @@ services:
       - --innodb_log_file_size=256M
       - --innodb_flush_log_at_trx_commit=2
       - --innodb_flush_method=O_DIRECT
+    ports:
+      - "33306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./data-migration/init-data/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
 
   data-migration:
     build: ./data-migration
-    volumes:
-      - ./data-migration/init-data:/app/init-data
     environment:
-      - DB_HOST=db
+      - NODE_ENV=production
+      - DB_HOST=callcenter-db
       - DB_PORT=3306
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
+    volumes:
+      - ./data-migration/init-data:/app/init-data
     depends_on:
-      - db
+      - callcenter-db
     networks:
       - app-network
 
@@ -52,7 +55,7 @@ services:
     build: ./data-schedule-sync
     environment:
       - NODE_ENV=production
-      - DB_HOST=db
+      - DB_HOST=callcenter-db
       - DB_PORT=3306
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
@@ -60,14 +63,13 @@ services:
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
     depends_on:
-      - data-migration
-      - db
+      - callcenter-db
     networks:
       - app-network
+
+volumes:
+  db_data:
 
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  mariadb_data: 

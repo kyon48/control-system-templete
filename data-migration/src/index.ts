@@ -12,7 +12,7 @@ const pool = mariadb.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: parseInt(process.env.DB_PORT || '3306'),
+    port: parseInt(process.env.DB_PORT || '33306'),
     connectionLimit: 5,
     keepAliveDelay: 10000,
     idleTimeout: 60000,

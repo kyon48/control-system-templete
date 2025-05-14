@@ -36,14 +36,43 @@ if docker ps -a | grep -q "callcenter-db\|data-migration\|data-sync"; then
     echo -e "${YELLOW}📦 실행 중인 컨테이너를 중지하고 삭제합니다...${NC}"
     docker compose down -v
 fi
-sleep 5
+sleep 3
+
+# 모든 관련 이미지 삭제
+echo -e "${YELLOW}🗑️  관련 Docker 이미지를 삭제합니다...${NC}"
+
+# mariadb 이미지 삭제
+if docker images | grep -q "mariadb"; then
+    echo -e "${YELLOW}🗑️  MariaDB 이미지를 삭제합니다...${NC}"
+    docker rmi $(docker images | grep 'mariadb' | awk '{print $3}') -f || true
+fi
+
+# 모든 프로젝트 관련 이미지 삭제 (더 넓은 패턴 사용)
+if docker images | grep -q "data-\|control-system-templete-"; then
+    echo -e "${YELLOW}🗑️  프로젝트 관련 이미지를 삭제합니다...${NC}"
+    docker rmi $(docker images | grep 'data-\|control-system-templete-' | awk '{print $3}') -f || true
+fi
+
+# Docker 빌드 캐시 및 빌더 삭제
+echo -e "${YELLOW}🧹 Docker 빌드 캐시를 삭제합니다...${NC}"
+# 모든 빌더 삭제
+echo -e "${YELLOW}🧹 Docker 빌더를 초기화합니다...${NC}"
+docker buildx ls | grep -v default | awk 'NR>1 {print $1}' | xargs -r docker buildx rm || true
+docker buildx prune -af || true
+
+# 기본 빌더 재설정
+echo -e "${YELLOW}🔄 기본 빌더를 재설정합니다...${NC}"
+docker buildx create --use --name default || true
+
+# 빌드 캐시 삭제
+docker builder prune -af --filter until=0s
 
 # 사용하지 않는 이미지, 네트워크, 볼륨 정리
 echo -e "${YELLOW}🗑️  사용하지 않는 Docker 리소스를 정리합니다...${NC}"
-docker system prune -f
-docker volume prune -f
-sleep 5
+docker system prune -af --volumes
+sleep 3
 
+echo -e "${GREEN}✨ Docker 환경이 완전히 초기화되었습니다.${NC}"
 
 # 4. 모든 서비스 실행
 echo -e "${GREEN}📦 모든 서비스를 시작합니다...${NC}"

@@ -2,11 +2,11 @@ services:
     mariadb:
         container_name: callcenter-db
         ports:
-            - '3306:3306'
+            - '33306:33306'
         restart: always
         volumes:
-            - ./mysqldata/conf.d:/etc/mysql/conf.d
-            - ./mysqldata/initdb.d:/docker-entrypoint-initdb.d
+            # - ./mysqldata/conf.d:/etc/mysql/conf.d
+            # - ./mysqldata/initdb.d:/docker-entrypoint-initdb.d
             - mariadb_data:/var/lib/mysql
         environment:
             - MYSQL_ROOT_PASSWORD=root
