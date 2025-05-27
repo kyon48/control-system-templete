@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@notionhq/client": "^2.2.14",
+    "axios": "^1.6.7",
     "dotenv": "^16.4.5",
     "mariadb": "^3.4.2",
     "mysql2": "^3.9.2",
