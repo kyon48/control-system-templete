@@ -269,6 +269,15 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
             })
         );
 
+        // 페이지 메타데이터 가져오기
+        const pageMetadata = await retryNotionApiCall(() =>
+            notion.pages.retrieve({
+                page_id: pageId
+            })
+        );
+
+        const properties = (pageMetadata as any).properties;
+
         // 페이지 내용을 마크다운으로 변환
         let markdownContent = '';
         for (const block of pageContent.results) {
@@ -294,7 +303,6 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
                     const imagePath = `images/${complaintId}/${imageName}`;
                     const fullImagePath = path.join(__dirname, '..', imagePath);
 
-                    
                     // 이미지 디렉토리 생성
                     const imageDir = path.dirname(fullImagePath);
                     if (!fs.existsSync(imageDir)) {
@@ -306,7 +314,7 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
                         await downloadImage(imageUrl, fullImagePath);
 
                         images.push({
-                            complaint_id: `CALL-${complaintId}`,
+                            complaint_id: complaintId,
                             image_path: imagePath,
                             image_name: imageName
                         });
@@ -319,17 +327,22 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
                 }
             }
         }
-        const properties = (pageContent.results[0] as any).properties;
 
         // 날짜 형식 변환 (한국 시간 기준)
-        const createdTime = new Date((pageContent as any).created_time);
-        const lastEditedTime = new Date((pageContent as any).last_edited_time);
+        const createdTime = new Date((pageMetadata as any).created_time);
+        const lastEditedTime = new Date((pageMetadata as any).last_edited_time);
+
+        // 날짜가 유효한지 확인
+        if (isNaN(createdTime.getTime()) || isNaN(lastEditedTime.getTime())) {
+            console.error(`Invalid date for complaint ${complaintId}, using current date`);
+            return;
+        }
 
         const formattedcreatedTime = `${createdTime.getFullYear()}.${String(createdTime.getMonth() + 1).padStart(2, '0')}.${String(createdTime.getDate()).padStart(2, '0')} ${String(createdTime.getHours()).padStart(2, '0')}:${String(createdTime.getMinutes()).padStart(2, '0')}:${String(createdTime.getSeconds()).padStart(2, '0')}`;
         const formattedEditedTime = `${lastEditedTime.getFullYear()}.${String(lastEditedTime.getMonth() + 1).padStart(2, '0')}.${String(lastEditedTime.getDate()).padStart(2, '0')} ${String(lastEditedTime.getHours()).padStart(2, '0')}:${String(lastEditedTime.getMinutes()).padStart(2, '0')}:${String(lastEditedTime.getSeconds()).padStart(2, '0')}`;
 
         const complaintData: ComplaintData = {
-            complaint_id: `CALL-${complaintId}`,
+            complaint_id: complaintId,
             page_id: pageId,
             complaint_date: parseDate(formattedcreatedTime),
             last_edit_date: parseDate(formattedEditedTime),
@@ -455,7 +468,8 @@ async function syncData() {
                 continue;
             }
 
-            const complaintId = `CALL-${getPropertyValue(properties, 'ID-2', 'unique_id')}`;
+            const numericId = getPropertyValue(properties, 'ID-2', 'unique_id');
+            const complaintId = `CALL-${numericId}`;
 
             const complaintData: ComplaintData = {
                 complaint_id: complaintId,
