@@ -44,12 +44,15 @@ services:
       - DB_NAME=${DB_NAME}
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
+      - SKIP_MIGRATION=${SKIP_MIGRATION:-false}
     volumes:
       - ./data-migration/init-data:/app/init-data
     depends_on:
       - callcenter-db
     networks:
       - app-network
+    profiles:
+      - migration
 
   data-schedule-sync:
     build: ./data-schedule-sync

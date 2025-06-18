@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# SKIP_MIGRATION 환경 변수 확인
+if [ "$SKIP_MIGRATION" = "true" ]; then
+    echo "SKIP_MIGRATION is set to true. Skipping data migration..."
+    echo "Migration skipped due to existing backup data"
+    touch /app/migration-complete
+    exit 0
+fi
+
 echo "Waiting for database to be ready..."
 MAX_RETRIES=30
 RETRY_INTERVAL=5
