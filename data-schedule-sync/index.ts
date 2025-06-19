@@ -78,14 +78,14 @@ function parseDate(dateStr: string): Date {
         return date;
     }
 
-    // ISO 형식 처리
+    // ISO 형식 처리 - 노션 API에서 가져온 시간은 UTC이므로 한국 시간으로 변환
     try {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) {
             console.warn(`Invalid date string: ${dateStr}, using current date`);
             return new Date();
         }
-        // UTC 시간에 9시간을 더해 KST로 변환
+        // UTC 시간에 9시간을 더해 한국 시간으로 변환
         return new Date(date.getTime() + 9 * 60 * 60 * 1000);
     } catch (error) {
         console.warn(`Error parsing date: ${dateStr}, using current date`);
@@ -328,9 +328,13 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
             }
         }
 
-        // 날짜 형식 변환 (한국 시간 기준)
-        const createdTime = new Date((pageMetadata as any).created_time);
-        const lastEditedTime = new Date((pageMetadata as any).last_edited_time);
+        // 노션 API에서 가져온 시간은 UTC이므로 한국 시간(KST)으로 변환
+        const utcCreatedTime = new Date((pageMetadata as any).created_time);
+        const utcLastEditedTime = new Date((pageMetadata as any).last_edited_time);
+        
+        // UTC 시간에 9시간을 더해 한국 시간으로 변환
+        const createdTime = new Date(utcCreatedTime.getTime() + 9 * 60 * 60 * 1000);
+        const lastEditedTime = new Date(utcLastEditedTime.getTime() + 9 * 60 * 60 * 1000);
 
         // 날짜가 유효한지 확인
         if (isNaN(createdTime.getTime()) || isNaN(lastEditedTime.getTime())) {
@@ -338,14 +342,11 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
             return;
         }
 
-        const formattedcreatedTime = `${createdTime.getFullYear()}.${String(createdTime.getMonth() + 1).padStart(2, '0')}.${String(createdTime.getDate()).padStart(2, '0')} ${String(createdTime.getHours()).padStart(2, '0')}:${String(createdTime.getMinutes()).padStart(2, '0')}:${String(createdTime.getSeconds()).padStart(2, '0')}`;
-        const formattedEditedTime = `${lastEditedTime.getFullYear()}.${String(lastEditedTime.getMonth() + 1).padStart(2, '0')}.${String(lastEditedTime.getDate()).padStart(2, '0')} ${String(lastEditedTime.getHours()).padStart(2, '0')}:${String(lastEditedTime.getMinutes()).padStart(2, '0')}:${String(lastEditedTime.getSeconds()).padStart(2, '0')}`;
-
         const complaintData: ComplaintData = {
             complaint_id: complaintId,
             page_id: pageId,
-            complaint_date: parseDate(formattedcreatedTime),
-            last_edit_date: parseDate(formattedEditedTime),
+            complaint_date: createdTime,
+            last_edit_date: lastEditedTime,
             complainant_tel_no: (getPropertyValue(properties, '신고자연락처', 'rich_text') || '').substring(0, 20),
             complainant_truck_no: (getPropertyValue(properties, '차량번호', 'rich_text') || '').substring(0, 20),
             complainant_con_no: (getPropertyValue(properties, '컨테이너번호', 'rich_text') || '').substring(0, 20),
@@ -356,7 +357,7 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
             complaint_handler: (getPropertyValue(properties, '처리자', 'select') || '').substring(0, 50),
             complaint_type: (getPropertyValue(properties, '민원유형', 'select') || '').substring(0, 100),
             complaint_detail_type: (getPropertyValue(properties, '상세민원유형', 'multi_select') || '').substring(0, 100),
-            complaint_title: (getPropertyValue(properties, '민원내용', 'rich_text') || '').substring(0, 200),
+            complaint_title: (getPropertyValue(properties, '민원내용', 'title') || '').substring(0, 200),
             complaint_content: (getPropertyValue(properties, '문의상세', 'rich_text') || '').substring(0, 1000),
             complaint_processing: (getPropertyValue(properties, '처리내용', 'rich_text') || '').substring(0, 1000),
             complaint_handling: (getPropertyValue(properties, '민원처리', 'rich_text') || '').substring(0, 1000)
@@ -458,9 +459,13 @@ async function syncData() {
             const properties = (page as any).properties;
             const pageId = (page as any).id;
             
-            // 날짜 형식 변환 (한국 시간 기준)
-            const createdTime = new Date((page as any).created_time);
-            const lastEditedTime = new Date((page as any).last_edited_time);
+            // 노션 API에서 가져온 시간은 UTC이므로 한국 시간(KST)으로 변환
+            const utcCreatedTime = new Date((page as any).created_time);
+            const utcLastEditedTime = new Date((page as any).last_edited_time);
+            
+            // UTC 시간에 9시간을 더해 한국 시간으로 변환
+            const createdTime = new Date(utcCreatedTime.getTime() + 9 * 60 * 60 * 1000);
+            const lastEditedTime = new Date(utcLastEditedTime.getTime() + 9 * 60 * 60 * 1000);
 
             // 날짜가 유효한지 확인
             if (isNaN(createdTime.getTime()) || isNaN(lastEditedTime.getTime())) {
@@ -486,7 +491,7 @@ async function syncData() {
                 complaint_handler: (getPropertyValue(properties, '처리자', 'select') || '').substring(0, 50),
                 complaint_type: (getPropertyValue(properties, '민원유형', 'select') || '').substring(0, 100),
                 complaint_detail_type: (getPropertyValue(properties, '상세민원유형', 'multi_select') || '').substring(0, 100),
-                complaint_title: (getPropertyValue(properties, '민원내용', 'rich_text') || '').substring(0, 200),
+                complaint_title: (getPropertyValue(properties, '민원내용', 'title') || '').substring(0, 200),
                 complaint_content: (getPropertyValue(properties, '문의상세', 'rich_text') || '').substring(0, 1000),
                 complaint_processing: (getPropertyValue(properties, '처리내용', 'rich_text') || '').substring(0, 1000),
                 complaint_handling: (getPropertyValue(properties, '민원처리', 'rich_text') || '').substring(0, 1000)

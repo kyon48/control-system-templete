@@ -34,48 +34,57 @@ fi
 
 # 3. 기존 데이터 백업 확인
 if docker ps | grep -q "callcenter-db"; then
-    echo -e "${BLUE}💾 기존 데이터베이스가 실행 중입니다. 백업을 수행합니다...${NC}"
+    echo -e "${BLUE}💾 기존 데이터베이스가 실행 중입니다.${NC}"
     
-    # 백업 디렉토리 생성
-    if [ ! -d "$BACKUP_DIR" ]; then
-        mkdir -p "$BACKUP_DIR"
-    fi
-    
-    # 환경 변수 로드
-    source .env
-    
-    # 실제 컨테이너 이름 찾기
-    DB_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "callcenter-db" | head -1)
-    
-    if [ -z "$DB_CONTAINER" ]; then
-        echo -e "${YELLOW}⚠️  데이터베이스 컨테이너를 찾을 수 없습니다.${NC}"
-    else
-        echo -e "${BLUE}📦 데이터베이스 컨테이너: $DB_CONTAINER${NC}"
+    # 백업 수행 여부 질문
+    read -p "기존 데이터를 백업하시겠습니까? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}💾 백업을 수행합니다...${NC}"
         
-        # 백업 파일명 생성
-        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-        BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.sql"
-        
-        echo -e "${YELLOW}📦 데이터베이스 백업을 수행합니다...${NC}"
-        echo -e "${BLUE}📄 백업 파일: $BACKUP_FILE${NC}"
-        
-        # 데이터베이스 백업 실행
-        docker exec "$DB_CONTAINER" mariadb-dump \
-            -u"$DB_USER" \
-            -p"$DB_PASSWORD" \
-            --single-transaction \
-            --routines \
-            --triggers \
-            --events \
-            --add-drop-database \
-            --databases "$DB_NAME" > "$BACKUP_FILE"
-        
-        if [ -f "$BACKUP_FILE" ]; then
-            BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-            echo -e "${GREEN}✅ 백업이 완료되었습니다! (크기: $BACKUP_SIZE)${NC}"
-        else
-            echo -e "${YELLOW}⚠️  백업에 실패했습니다. 계속 진행합니다...${NC}"
+        # 백업 디렉토리 생성
+        if [ ! -d "$BACKUP_DIR" ]; then
+            mkdir -p "$BACKUP_DIR"
         fi
+        
+        # 환경 변수 로드
+        source .env
+        
+        # 실제 컨테이너 이름 찾기
+        DB_CONTAINER=$(docker ps --format "table {{.Names}}" | grep "callcenter-db" | head -1)
+        
+        if [ -z "$DB_CONTAINER" ]; then
+            echo -e "${YELLOW}⚠️  데이터베이스 컨테이너를 찾을 수 없습니다.${NC}"
+        else
+            echo -e "${BLUE}📦 데이터베이스 컨테이너: $DB_CONTAINER${NC}"
+            
+            # 백업 파일명 생성
+            TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+            BACKUP_FILE="${BACKUP_DIR}/db_backup_${TIMESTAMP}.sql"
+            
+            echo -e "${YELLOW}📦 데이터베이스 백업을 수행합니다...${NC}"
+            echo -e "${BLUE}📄 백업 파일: $BACKUP_FILE${NC}"
+            
+            # 데이터베이스 백업 실행
+            docker exec "$DB_CONTAINER" mariadb-dump \
+                -u"$DB_USER" \
+                -p"$DB_PASSWORD" \
+                --single-transaction \
+                --routines \
+                --triggers \
+                --events \
+                --add-drop-database \
+                --databases "$DB_NAME" > "$BACKUP_FILE"
+            
+            if [ -f "$BACKUP_FILE" ]; then
+                BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+                echo -e "${GREEN}✅ 백업이 완료되었습니다! (크기: $BACKUP_SIZE)${NC}"
+            else
+                echo -e "${YELLOW}⚠️  백업에 실패했습니다. 계속 진행합니다...${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}⚠️  백업을 건너뜁니다.${NC}"
     fi
 fi
 

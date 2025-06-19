@@ -386,17 +386,19 @@ async function syncLatestData(conn: mariadb.PoolConnection) {
             // 각 속성의 값을 추출하는 헬퍼 함수
             const complaintId = `CALL-${getPropertyValue(properties, 'ID-2', 'unique_id')}`;
 
-            const createdTime = new Date(new Date((page as PageObjectResponse).created_time).getTime());
-            const editedTime = new Date(new Date((page as PageObjectResponse).last_edited_time).getTime());
+            // 노션 API에서 가져온 시간은 UTC이므로 한국 시간(KST)으로 변환
+            const utcCreatedTime = new Date((page as PageObjectResponse).created_time);
+            const utcEditedTime = new Date((page as PageObjectResponse).last_edited_time);
             
-            const formattedcreatedTime = `${createdTime.getFullYear()}.${String(createdTime.getMonth() + 1).padStart(2, '0')}.${String(createdTime.getDate()).padStart(2, '0')} ${String(createdTime.getHours()).padStart(2, '0')}:${String(createdTime.getMinutes()).padStart(2, '0')}:${String(createdTime.getSeconds()).padStart(2, '0')}`;
-            const formattedEditedTime = `${editedTime.getFullYear()}.${String(editedTime.getMonth() + 1).padStart(2, '0')}.${String(editedTime.getDate()).padStart(2, '0')} ${String(editedTime.getHours()).padStart(2, '0')}:${String(editedTime.getMinutes()).padStart(2, '0')}:${String(editedTime.getSeconds()).padStart(2, '0')}`;
+            // UTC 시간에 9시간을 더해 한국 시간으로 변환
+            const createdTime = new Date(utcCreatedTime.getTime() + 9 * 60 * 60 * 1000);
+            const editedTime = new Date(utcEditedTime.getTime() + 9 * 60 * 60 * 1000);
 
             const complaintData: ComplaintData = {
                 complaint_id: complaintId,
                 page_id: pageId,
-                complaint_date: parseDate(formattedcreatedTime),
-                last_edit_date: parseDate(formattedEditedTime),
+                complaint_date: createdTime,
+                last_edit_date: editedTime,
                 complainant_tel_no: (getPropertyValue(properties, '신고자연락처', 'rich_text') || '').substring(0, 20),
                 complainant_truck_no: (getPropertyValue(properties, '차량번호', 'rich_text') || '').substring(0, 20),
                 complainant_con_no: (getPropertyValue(properties, '컨테이너번호', 'rich_text') || '').substring(0, 20),
@@ -407,7 +409,7 @@ async function syncLatestData(conn: mariadb.PoolConnection) {
                 complaint_handler: (getPropertyValue(properties, '처리자', 'select') || '').substring(0, 50),
                 complaint_type: (getPropertyValue(properties, '민원유형', 'select') || '').substring(0, 100),
                 complaint_detail_type: (getPropertyValue(properties, '상세민원유형', 'multi_select') || '').substring(0, 100),
-                complaint_title: (getPropertyValue(properties, '민원내용', 'rich_text') || '').substring(0, 200),
+                complaint_title: (getPropertyValue(properties, '민원내용', 'title') || '').substring(0, 200),
                 complaint_content: (getPropertyValue(properties, '문의상세', 'rich_text') || '').substring(0, 1000),
                 complaint_processing: (getPropertyValue(properties, '처리내용', 'rich_text') || '').substring(0, 1000),
                 complaint_handling: (getPropertyValue(properties, '민원처리', 'rich_text') || '').substring(0, 1000)
