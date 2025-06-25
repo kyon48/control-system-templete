@@ -4,6 +4,10 @@ import { Client } from '@notionhq/client';
 import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // MariaDB 연결 풀 생성
 const pool = mariadb.createPool({
@@ -46,53 +50,19 @@ interface ComplaintData {
     complaint_handling: string;
 }
 
-interface PageContent {
-    complaint_id: string;
-    page_content: string;
-}
-
 interface ImageData {
     complaint_id: string;
     image_path: string;
     image_name: string;
 }
 
-// 한국어 날짜를 Date 객체로 변환하는 함수
-function parseDate(dateStr: string): Date {
-    if (!dateStr) return new Date();
-
-    // 한국어 날짜 형식 처리 (예: "2025년 5월 12일 오전 11:37")
-    const koreanMatch = dateStr.match(/(\d{4})년 (\d{1,2})월 (\d{1,2})일 (오전|오후) (\d{1,2}):(\d{2})/);
-    if (koreanMatch) {
-        const [_, year, month, day, ampm, hour, minute] = koreanMatch;
-        let hour24 = parseInt(hour);
-
-        if (ampm === '오후' && hour24 < 12) {
-            hour24 += 12;
-        }
-        if (ampm === '오전' && hour24 === 12) {
-            hour24 = 0;
-        }
-
-        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hour24, parseInt(minute));
-        return date;
-    }
-
-    // ISO 형식 처리 - 노션 API에서 가져온 시간은 UTC이므로 한국 시간으로 변환
-    try {
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) {
-            console.warn(`Invalid date string: ${dateStr}, using current date`);
-            return new Date();
-        }
-        // UTC 시간에 9시간을 더해 한국 시간으로 변환
-        return new Date(date.getTime() + 9 * 60 * 60 * 1000);
-    } catch (error) {
-        console.warn(`Error parsing date: ${dateStr}, using current date`);
-        return new Date();
-    }
+interface CommentData {
+    comment_id: string;
+    complaint_id: string;
+    author_name: string;
+    comment_content: string;
+    comment_created_at: Date;
 }
-
 
 // 한국 시간 형식으로 포맷팅하는 함수
 function formatKoreanTime(date: Date): string {
@@ -410,7 +380,14 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
                 [complaintData.complaint_id, markdownContent]
             );
 
-            // 이미지 정보 저장
+            // 이미지 정보 저장 - 기존 이미지 삭제 후 새로 저장
+            // 먼저 기존 이미지 정보 삭제
+            await conn.query(
+                'DELETE FROM t_complaint_images WHERE complaint_id = ?',
+                [complaintData.complaint_id]
+            );
+
+            // 새로운 이미지 정보 저장
             for (const image of images) {
                 await conn.query(
                     `INSERT INTO t_complaint_images (complaint_id, image_path, image_name)
@@ -425,6 +402,48 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
         }
     } catch (err) {
         console.error(`Error saving page content and images for complaint ${complaintId}:`, err);
+    }
+}
+
+async function savePageComments(conn: mariadb.PoolConnection, pageId: string, complaintId: string) {
+    try {
+        const response = await retryNotionApiCall(() => 
+            notion.comments.list({
+                block_id: pageId,
+            })
+        );
+
+        for (const comment of response.results) {
+            if ('created_by' in comment && 'rich_text' in comment && comment.rich_text.length > 0) {
+                const author = await retryNotionApiCall(() => notion.users.retrieve({ user_id: comment.created_by.id }));
+                const authorName = 'name' in author && author.name ? author.name : 'Unknown User';
+                
+                const commentContent = (comment.rich_text as any[]).map(rt => rt.plain_text).join('');
+
+                const utcCommentCreatedAt = new Date(comment.created_time);
+                const kstCommentCreatedAt = new Date(utcCommentCreatedAt.getTime() + 9 * 60 * 60 * 1000);
+
+                const commentData: CommentData = {
+                    comment_id: comment.id,
+                    complaint_id: complaintId,
+                    author_name: authorName,
+                    comment_content: commentContent,
+                    comment_created_at: kstCommentCreatedAt,
+                };
+
+                await conn.query(
+                    `INSERT INTO t_complaint_comment (comment_id, complaint_id, author_name, comment_content, comment_created_at)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        author_name = VALUES(author_name),
+                        comment_content = VALUES(comment_content),
+                        comment_created_at = VALUES(comment_created_at)`,
+                    Object.values(commentData)
+                );
+            }
+        }
+    } catch (error) {
+        console.error(`Error saving comments for page ${pageId}:`, error);
     }
 }
 
@@ -506,6 +525,9 @@ async function syncData() {
             try {
                 // 페이지 내용과 이미지 저장
                 await savePageContentAndImages(conn, pageId, complaintId);
+
+                // 페이지 댓글 저장
+                await savePageComments(conn, pageId, complaintId);
                 
                 // 기존 complaint 데이터 저장
                 await conn.query(

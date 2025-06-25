@@ -2,6 +2,7 @@
 DROP TABLE IF EXISTS t_complaint;
 DROP TABLE IF EXISTS t_complaint_content;
 DROP TABLE IF EXISTS t_complaint_images;
+DROP TABLE IF EXISTS t_complaint_comment;
 
 -- 테이블 생성
 CREATE TABLE t_complaint (
@@ -38,13 +39,26 @@ CREATE TABLE t_complaint_content (
 
 -- 이미지 정보를 저장할 테이블
 CREATE TABLE t_complaint_images (
-    image_id VARCHAR(50) PRIMARY KEY,
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
     complaint_id VARCHAR(50),
     image_path VARCHAR(255),
     image_name VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (complaint_id) REFERENCES t_complaint(complaint_id)
+    FOREIGN KEY (complaint_id) REFERENCES t_complaint(complaint_id),
+    UNIQUE KEY unique_complaint_image (complaint_id, image_name)
 );
+
+-- 댓글 테이블 생성
+CREATE TABLE t_complaint_comment (
+  comment_id VARCHAR(50) PRIMARY KEY,
+  complaint_id VARCHAR(50) NOT NULL,
+  author_name VARCHAR(100),
+  comment_content TEXT,
+  comment_created_at DATETIME,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (complaint_id) REFERENCES t_complaint(complaint_id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 인덱스 추가
 CREATE INDEX idx_complaint_date ON t_complaint(complaint_date);

@@ -48,15 +48,18 @@ interface ComplaintData {
     complaint_handling: string;
 }
 
-interface PageContent {
-    complaint_id: string;
-    page_content: string;
-}
-
 interface ImageData {
     complaint_id: string;
     image_path: string;
     image_name: string;
+}
+
+interface CommentData {
+    comment_id: string;
+    complaint_id: string;
+    author_name: string;
+    comment_content: string;
+    comment_created_at: Date;
 }
 
 function parseDate(dateStr: string): Date {
@@ -135,6 +138,47 @@ const getPropertyValue = (properties: any, propertyName: string, type: string) =
             return '';
     }
 };
+
+async function savePageComments(conn: mariadb.PoolConnection, pageId: string, complaintId: string) {
+    try {
+        const response = await notion.comments.list({
+            block_id: pageId,
+        });
+
+        for (const comment of response.results) {
+            if ('created_by' in comment && 'rich_text' in comment && comment.rich_text.length > 0) {
+                const author = await notion.users.retrieve({ user_id: comment.created_by.id });
+                const authorName = 'name' in author && author.name ? author.name : 'Unknown User';
+                
+                const commentContent = (comment.rich_text as any[]).map(rt => rt.plain_text).join('');
+
+                const utcCommentCreatedAt = new Date(comment.created_time);
+                const kstCommentCreatedAt = new Date(utcCommentCreatedAt.getTime() + 9 * 60 * 60 * 1000);
+
+                const commentData: CommentData = {
+                    comment_id: comment.id,
+                    complaint_id: complaintId,
+                    author_name: authorName,
+                    comment_content: commentContent,
+                    comment_created_at: kstCommentCreatedAt,
+                };
+
+                await conn.query(
+                    `INSERT INTO t_complaint_comment (comment_id, complaint_id, author_name, comment_content, comment_created_at)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        author_name = VALUES(author_name),
+                        comment_content = VALUES(comment_content),
+                        comment_created_at = VALUES(comment_created_at)`,
+                    Object.values(commentData)
+                );
+            }
+        }
+    } catch (error) {
+        console.error(`Error saving comments for page ${pageId}:`, error);
+    }
+}
+
 // 페이지 내용과 이미지 저장 함수
 async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: string, complaintId: string) {
     try {
@@ -268,6 +312,10 @@ async function savePageContentAndImages(conn: mariadb.PoolConnection, pageId: st
         }
 
         console.log(`Saved page content and images for complaint: ${complaintId}`);
+
+        // 페이지 댓글 저장
+        await savePageComments(conn, pageId, complaintId);
+
     } catch (err) {
         console.error(`Error saving page content and images for complaint ${complaintId}:`, err);
     }
@@ -332,14 +380,14 @@ async function fetchAndSaveNotionPageId(conn: mariadb.PoolConnection, complaintI
 // 모든 complaint에 대한 페이지 내용 저장 함수
 async function saveAllPageContents(conn: mariadb.PoolConnection) {
     try {
-        console.log('Fetching all complaints to save page contents...');
+        console.log('Fetching complaints from the last 30 days to save page contents...');
         
-        // t_complaint 테이블에서 page_id가 비어있는 complaint_id를 내림차순으로 조회
+        // t_complaint 테이블에서 page_id가 비어있고, 최근 30일 내에 수정된 complaint_id를 내림차순으로 조회
         const rows = await conn.query(
-            'SELECT complaint_id, page_id FROM t_complaint WHERE page_id = "" ORDER BY CAST(SUBSTRING(complaint_id, 6) AS UNSIGNED) DESC'
+            'SELECT complaint_id, page_id FROM t_complaint WHERE page_id = "" AND last_edit_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) ORDER BY CAST(SUBSTRING(complaint_id, 6) AS UNSIGNED) DESC'
         );
 
-        console.log(`Found ${rows.length} complaints to process`);
+        console.log(`Found ${rows.length} complaints to process from the last 30 days`);
 
         for (const row of rows) {
             try {
@@ -349,6 +397,8 @@ async function saveAllPageContents(conn: mariadb.PoolConnection) {
                 if (pageId) {
                     // 페이지 내용과 이미지 저장
                     await savePageContentAndImages(conn, pageId, row.complaint_id);
+                    // 페이지 댓글 저장
+                    await savePageComments(conn, pageId, row.complaint_id);
                     console.log(`Processed page content for complaint: ${row.complaint_id}`);
                 }
             } catch (err) {
