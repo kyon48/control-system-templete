@@ -31,7 +31,7 @@ services:
       - db_data:/var/lib/mysql
       - ./data-migration/init-data/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - app-network
+      - control-system_chainportal-control-system
 
   data-migration:
     build: ./data-migration
@@ -50,7 +50,7 @@ services:
     depends_on:
       - callcenter-db
     networks:
-      - app-network
+      - control-system_chainportal-control-system
     profiles:
       - migration
 
@@ -68,11 +68,11 @@ services:
     depends_on:
       - callcenter-db
     networks:
-      - app-network
+      - control-system_chainportal-control-system
 
 volumes:
   db_data:
 
 networks:
-  app-network:
-    driver: bridge
+  control-system_chainportal-control-system:
+    external: true
