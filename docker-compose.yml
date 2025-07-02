@@ -3,6 +3,7 @@ version: '3.8'
 services:
   callcenter-db:
     image: mariadb:11.7.2
+    container_name: callcenter-db
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
       - MYSQL_DATABASE=${DB_NAME}
@@ -32,9 +33,22 @@ services:
       - ./data-migration/init-data/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - chainportal-control-system
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "3"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # extra_hosts:
+    #   - "accio.chainportal.co.kr:127.28.0.11"
 
   data-migration:
     build: ./data-migration
+    container_name: data-migration
     environment:
       - NODE_ENV=production
       - DB_HOST=callcenter-db
@@ -45,6 +59,7 @@ services:
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
       - SKIP_MIGRATION=${SKIP_MIGRATION:-false}
+      - TZ=Asia/Seoul
     volumes:
       - ./data-migration/init-data:/app/init-data
     depends_on:
@@ -53,9 +68,22 @@ services:
       - chainportal-control-system
     profiles:
       - migration
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "3"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # extra_hosts:
+    #   - "accio.chainportal.co.kr:127.28.0.11"
 
   data-schedule-sync:
     build: ./data-schedule-sync
+    container_name: data-schedule-sync
     environment:
       - NODE_ENV=production
       - DB_HOST=callcenter-db
@@ -65,13 +93,27 @@ services:
       - DB_NAME=${DB_NAME}
       - NOTION_API_KEY=${NOTION_API_KEY}
       - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
+      - TZ=Asia/Seoul
     depends_on:
       - callcenter-db
     networks:
       - chainportal-control-system
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m"
+        max-file: "3"
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # extra_hosts:
+    #   - "accio.chainportal.co.kr:127.28.0.11"
 
 volumes:
   db_data:
+    driver: local
 
 networks:
   chainportal-control-system:

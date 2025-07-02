@@ -104,10 +104,8 @@ fi
 echo -e "${YELLOW}🧹 기존 컨테이너를 정리합니다...${NC}"
 
 # 실행 중인 컨테이너 중지 및 삭제
-if docker ps -a | grep -q "callcenter-db\|data-migration\|data-sync"; then
-    echo -e "${YELLOW}📦 실행 중인 컨테이너를 중지하고 삭제합니다...${NC}"
-    docker compose down -v
-fi
+echo -e "${YELLOW}📦 실행 중인 컨테이너를 중지하고 삭제합니다...${NC}"
+docker compose down -v
 sleep 3
 
 # 모든 관련 이미지 삭제

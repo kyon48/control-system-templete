@@ -65,16 +65,33 @@ docker exec "$DB_CONTAINER" mariadb-dump \
 # 백업 파일 크기 확인
 if [ -f "$BACKUP_FILE" ]; then
     BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-    echo -e "${GREEN}✅ 백업이 완료되었습니다!${NC}"
+    echo -e "${GREEN}✅ SQL 백업이 완료되었습니다!${NC}"
     echo -e "${BLUE}📊 백업 파일 크기: $BACKUP_SIZE${NC}"
     echo -e "${BLUE}📁 백업 위치: $BACKUP_FILE${NC}"
-    
-    # 최근 백업 파일들을 보여줌
-    echo -e "\n${YELLOW}📋 최근 백업 파일들:${NC}"
-    ls -la "$BACKUP_DIR"/*.sql 2>/dev/null | tail -5 || echo "백업 파일이 없습니다."
 else
-    echo -e "${RED}❌ 백업에 실패했습니다.${NC}"
+    echo -e "${RED}❌ SQL 백업에 실패했습니다.${NC}"
     exit 1
 fi
+
+# 데이터베이스 볼륨 백업 (tar 파일)
+echo -e "\n${YELLOW}📦 데이터베이스 볼륨 백업을 시작합니다...${NC}"
+VOLUME_BACKUP_FILE="callcenter-db.tar"
+
+# 데이터베이스 볼륨 백업
+docker run --rm -v callcenter-db:/data -v "$(pwd):/backup" alpine tar czf "/backup/callcenter-db.tar" -C /data .
+
+if [ -f "$VOLUME_BACKUP_FILE" ]; then
+    VOLUME_BACKUP_SIZE=$(du -h "$VOLUME_BACKUP_FILE" | cut -f1)
+    echo -e "${GREEN}✅ 볼륨 백업이 완료되었습니다!${NC}"
+    echo -e "${BLUE}📊 볼륨 백업 파일 크기: $VOLUME_BACKUP_SIZE${NC}"
+    echo -e "${BLUE}📁 볼륨 백업 위치: $VOLUME_BACKUP_FILE${NC}"
+else
+    echo -e "${RED}❌ 볼륨 백업에 실패했습니다.${NC}"
+fi
+
+# 최근 백업 파일들을 보여줌
+echo -e "\n${YELLOW}📋 최근 백업 파일들:${NC}"
+ls -la "$BACKUP_DIR"/*.sql 2>/dev/null | tail -3 || echo "SQL 백업 파일이 없습니다."
+ls -la "callcenter-db.tar" 2>/dev/null || echo "볼륨 백업 파일이 없습니다."
 
 echo -e "\n${GREEN}🎉 데이터베이스 백업이 성공적으로 완료되었습니다!${NC}" 
