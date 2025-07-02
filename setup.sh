@@ -88,7 +88,19 @@ if docker ps | grep -q "callcenter-db"; then
     fi
 fi
 
-# 4. 기존 컨테이너 정리
+# 4. 네트워크 확인 및 연결
+echo -e "${BLUE}🌐 네트워크 연결을 확인합니다...${NC}"
+
+# chainportal-control-system 네트워크가 존재하는지 확인
+if ! docker network ls | grep -q "chainportal-control-system"; then
+    echo -e "${YELLOW}⚠️  chainportal-control-system 네트워크가 존재하지 않습니다.${NC}"
+    echo -e "${YELLOW}⚠️  네트워크를 먼저 생성하거나 기존 컨테이너를 확인해주세요.${NC}"
+    exit 1
+else
+    echo -e "${GREEN}✅ chainportal-control-system 네트워크가 존재합니다.${NC}"
+fi
+
+# 5. 기존 컨테이너 정리
 echo -e "${YELLOW}🧹 기존 컨테이너를 정리합니다...${NC}"
 
 # 실행 중인 컨테이너 중지 및 삭제
@@ -132,9 +144,15 @@ echo -e "${YELLOW}🗑️  사용하지 않는 Docker 리소스를 정리합니�
 docker system prune -af --volumes
 sleep 3
 
+# 기존 app-network 삭제 (있다면)
+if docker network ls | grep -q "control-system-templete_app-network"; then
+    echo -e "${YELLOW}🗑️  기존 app-network를 삭제합니다...${NC}"
+    docker network rm control-system-templete_app-network || true
+fi
+
 echo -e "${GREEN}✨ Docker 환경이 완전히 초기화되었습니다.${NC}"
 
-# 5. 모든 서비스 실행
+# 6. 모든 서비스 실행
 echo -e "${GREEN}📦 모든 서비스를 시작합니다...${NC}"
 
 # 백업 파일이 있는지 확인
@@ -159,11 +177,11 @@ else
     docker compose --profile migration up -d
 fi
 
-# 6. 데이터베이스가 준비될 때까지 대기
+# 7. 데이터베이스가 준비될 때까지 대기
 echo -e "${YELLOW}⏳ 데이터베이스가 준비될 때까지 대기합니다...${NC}"
 sleep 10
 
-# 7. 백업 복원 확인
+# 8. 백업 복원 확인
 if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR/*.sql 2>/dev/null)" ]; then
     echo -e "${BLUE}🔄 백업 파일이 발견되었습니다. 복원 여부를 확인합니다...${NC}"
     
@@ -203,9 +221,7 @@ echo -e "${GREEN}✅ 모든 설정이 완료되었습니다!${NC}"
 echo -e "${YELLOW}📝 시스템 상태 확인:${NC}"
 echo "1. 데이터베이스 상태:"
 docker ps | grep callcenter-db
-echo "2. 데이터 마이그레이션 상태:"
-docker ps | grep data-migration
-echo "3. 스케줄러 상태:"
+echo "2. 스케줄러 상태:"
 docker ps | grep data-schedule-sync
 
 echo -e "\n${GREEN}🎉 시스템이 정상적으로 실행되었습니다.${NC}"

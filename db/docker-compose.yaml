@@ -44,6 +44,12 @@ services:
             nofile:
                 soft: 65535
                 hard: 65535
+        networks:
+            - chainportal-control-system
 
 volumes:
     mariadb_data:
+
+networks:
+    chainportal-control-system:
+        external: true
