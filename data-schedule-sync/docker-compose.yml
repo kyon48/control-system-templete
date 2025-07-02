@@ -16,12 +16,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - app-network
+      - chainportal-control-system
     command: ["node", "dist/index.js"]
     init: true
     container_name: data-schedule-sync
     rm: true
 
 networks:
-  app-network:
-    driver: bridge
+  chainportal-control-system:
+    external: true
